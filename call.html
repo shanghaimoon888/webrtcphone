@@ -1,0 +1,480 @@
+﻿<!DOCTYPE html>
+<html>
+
+<head>
+	<meta charset="utf-8">
+	<title>sipjstest</title>
+	<link rel="stylesheet" href="css/style.css" />
+</head>
+
+<body>
+	<div>
+		<input id="number" value="18917981111" type="text" />
+		<button id="startCall">拨打</button>
+		<button id="endCall">挂机</button>
+		<button id="transfer">盲转</button>
+		<button id="xfer">协商转</button>
+		<button id="callcelxfer">取消协商转</button>
+		<button id="hold">保持</button>
+		<button id="unhold">取消保持</button>
+		<button id="mute">静音</button>
+		<button id="unmute">取消静音</button>
+	</div>
+	<br>
+	<div>
+
+		<video id="remoteVideo" autoplay="autoplay"></video>
+		<video id="localVideo" autoplay="autoplay" muted="muted"></video>
+		<!-- DTMF -->
+		<div id="dtmf-buttons">
+			<button onclick="sendDtmf('1');">1</button>
+			<button onclick="sendDtmf('2');">2</button>
+			<button onclick="sendDtmf('3');">3</button>
+			<button onclick="sendDtmf('4');">4</button>
+			<button onclick="sendDtmf('5');">5</button>
+			<button onclick="sendDtmf('6');">6</button>
+			<button onclick="sendDtmf('7');">7</button>
+			<button onclick="sendDtmf('8');">8</button>
+			<button onclick="sendDtmf('9');">9</button>
+			<button onclick="sendDtmf('0');">0</button>
+			<button onclick="sendDtmf('#');">#</button>
+			<button onclick="sendDtmf('*');">*</button>
+		</div>
+	</div>
+
+	<script src="./js/sip-0.13.8.js"></script>
+	<script>
+
+		var extCode = "1001"; //分机号
+		var extPass = "1001"; //分机密码
+		var config = {
+			uri: "sip:" + extCode + '@119.3.2.1:5066',
+			authorizationUser: extCode,
+			password: extPass,
+			displayName: extCode,
+			log: {
+				builtinEnabled: true,
+				level: 3 // log日志级别
+			},
+			transportOptions: {
+				wsServers: ['ws://119.3.2.1:5066'], //wss协议
+				traceSip: true  //开启sip日志,用于排查问题
+			},
+			allowLegacyNotifications: true,
+			hackWssInTransport: false, // 设置为true 则注册时 transport=wss; false:transport=ws;
+
+			hackIpInContact: "192.168.0.2",
+			userAgentString: "smarkdeskclient",
+			registerOptions: {
+				expires: 300,
+				registrar: 'sip:registrar.mydomain.com',
+			},
+
+			contactName: "1001",
+		};
+		var ua = new SIP.UA(config);
+
+		var sessionall;
+		var startCall = document.getElementById('startCall');
+		var endCall = document.getElementById('endCall');
+		var transfer = document.getElementById('transfer');
+		var hold = document.getElementById('hold');
+		var unhold = document.getElementById('unhold');
+		var mute = document.getElementById('mute');
+		var unmute = document.getElementById('unmute');
+
+
+		function bindEvent(obj, ev, fn) {
+			if (obj.attachEvent) {
+				obj.attachEvent("on" + ev, fn);
+			}
+			else {
+				obj.addEventListener(ev, fn, false);
+			}
+		}
+
+		/**
+		 *  发送DTMF
+		 * @param num 按键
+		 */
+		function sendDtmf(num) {
+			sessionall.dtmf(num);
+		}
+
+		/**
+		 * 拨打电话
+		 */
+		bindEvent(startCall, 'click', function () {
+
+			var number = document.getElementById("number").value;
+			//创建一个新的出站（用户代理客户端）会话
+			sessionall = ua.invite(number, {
+				sessionDescriptionHandlerOptions: {
+					constraints: {
+						audio: true,
+						video: false
+					},
+					alwaysAcquireMediaFirst: true // 此参数是sip.js官方修复在firefox遇到的bug所设置
+				}
+			});
+
+			var remoteVideo = document.getElementById('remoteVideo');
+			var localVideo = document.getElementById('localVideo');
+
+			//处理接受183早期媒体
+			sessionall.on('trackAdded', function () {
+
+				var pc = this.sessionDescriptionHandler.peerConnection;
+				var remoteStream;
+
+				if (pc.getReceivers) {
+					remoteStream = new window.MediaStream();
+					pc.getReceivers().forEach(function (receiver) {
+						var track = receiver.track;
+						if (track) {
+							remoteStream.addTrack(track);
+						}
+					});
+				} else {
+					remoteStream = pc.getRemoteStreams()[0];
+				}
+				remoteVideo.srcObject = remoteStream;
+
+				var localStream_1;
+				if (pc.getSenders) {
+					localStream_1 = new window.MediaStream();
+					pc.getSenders().forEach(function (sender) {
+						var track = sender.track;
+						if (track && track.kind === "video") {
+							localStream_1.addTrack(track);
+						}
+					});
+				}
+				else {
+					localStream_1 = pc.getLocalStreams()[0];
+				}
+				localVideo.srcObject = localStream_1;
+			});
+
+			//每次收到成功的最终（200-299）响应时都会触发。
+			sessionall.on("accepted", function (response, cause) {
+				console.log(response);
+				var pc = this.sessionDescriptionHandler.peerConnection;
+				var remoteStream;
+
+				if (pc.getReceivers) {
+					remoteStream = new window.MediaStream();
+					pc.getReceivers().forEach(function (receiver) {
+						var track = receiver.track;
+						if (track) {
+							remoteStream.addTrack(track);
+						}
+					});
+				} else {
+					remoteStream = pc.getRemoteStreams()[0];
+				}
+				remoteVideo.srcObject = remoteStream;
+
+
+				var localStream_1;
+				if (pc.getSenders) {
+					localStream_1 = new window.MediaStream();
+					pc.getSenders().forEach(function (sender) {
+						var track = sender.track;
+						if (track && track.kind === "video") {
+							localStream_1.addTrack(track);
+						}
+					});
+				}
+				else {
+					localStream_1 = pc.getLocalStreams()[0];
+				}
+				localVideo.srcObject = localStream_1;
+			})
+
+			//挂机时会触发
+			sessionall.on("bye", function (response, cause) {
+				console.log(response);
+			})
+
+			//请求失败时触发，无论是由于最终响应失败，还是由于超时，传输或其他错误。
+			sessionall.on("failed", function (response, cause) {
+				console.log(response);
+			})
+
+			/**
+			 *
+			 */
+			sessionall.on("terminated", function (message, cause) {
+			})
+
+			/**
+			 * 对方拒绝
+			 */
+			sessionall.on('rejected', function (response, cause) {
+			})
+
+			sessionall.on('progress', function (response) {
+				// InviteClientContext#receiveInviteResponse
+				if (response.statusCode === 183 && response.body && this.hasOffer && !this.dialog) {
+					if (!response.hasHeader('require') || response.getHeader('require').indexOf('100rel') === -1) {
+						if (this.sessionDescriptionHandler.hasDescription(response.getHeader('Content-Type'))) {
+							// Mimic rel-100 behavior
+
+							if (!this.createDialog(response, 'UAC')) { // confirm the dialog, eventhough it's a provisional answer
+								return
+							}
+
+							// this ensures that 200 will not try to set description
+							this.hasAnswer = true
+
+							// This ensures that when you receive a 1XX after the 183, no
+							// earlyDialog are created once the dialog has been confirmed.
+							//
+							// Without this piece of code:
+							//  1. upon reception of a 1XX a new earlyDialog is created and a
+							//     PRACK is send (CSEQ is incremented in this new dialog object).
+							//  2. at some point we receive the 200.
+							//  3. when sending a SIP INFO it will use the CSEQ from the confirmed
+							//     dialog. This CSEQ was already used when sending the PRACK.
+							//     Asterisk ignores this message since it thinks it is a
+							//     retransmit.
+							this.dialog.pracked.push(response.getHeader('rseq'))
+
+							// This is different from the behaviour in SIP.JS. Due to concurrency
+							// issues, we need to consider that we already have STATUS_EARLY_MEDIA
+							// before actually setting the description.
+							//
+							// @hack: https://github.com/onsip/SIP.js/issues/242
+							this.status = SIP.Session.C.STATUS_EARLY_MEDIA
+
+							// Mute local streams since we are going to establish early media.
+							//this.mute()
+
+							this.sessionDescriptionHandler
+								.setDescription(response.body, this.sessionDescriptionHandlerOptions, this.modifiers)
+								.catch((reason) => {
+									this.logger.warn(reason)
+									this.failed(response, C.causes.BAD_MEDIA_DESCRIPTION)
+									this.terminate({ status_code: 488, reason_phrase: 'Bad Media Description' })
+								})
+
+
+
+
+						}
+					}
+				}
+			});
+		})
+
+
+		//挂断事件
+		bindEvent(endCall, 'click', function () {
+			if (!sessionall) {
+				return;
+			} else if (sessionall.startTime) { // Connected
+				sessionall.bye();
+			} else if (sessionall.reject) { // Incoming
+				sessionall.reject();
+			} else if (sessionall.cancel) { // Outbound
+				sessionall.cancel();
+			}
+		})
+
+
+		//电话转移盲转
+		bindEvent(transfer, 'click', function () {
+			if (!sessionall) {
+				return;
+			}
+			var number = document.getElementById("number").value;
+			
+			sessionall.dtmf('*1');
+			sessionall.dtmf(number);
+			sessionall.dtmf('#');
+			
+		})
+		
+		//电话协商转
+		bindEvent(xfer, 'click', function () {
+			if (!sessionall) {
+				return;
+			}
+			var number = document.getElementById("number").value;
+			
+			sessionall.dtmf('*4');
+			sessionall.dtmf(number);
+			sessionall.dtmf('#');
+			
+		})
+		
+		//取消电话协商转
+		bindEvent(cancelxfer, 'click', function () {
+			sessionall.dtmf('#');			
+		})
+
+
+		//电话保持
+		bindEvent(hold, 'click', function () {
+			if (!sessionall) {
+				return;
+			}
+			sessionall.hold();
+		})
+
+
+		//恢复电话保持
+		bindEvent(unhold, 'click', function () {
+			if (!sessionall) {
+				return;
+			}
+			sessionall.unhold();
+		})
+
+
+
+		// 静音
+		bindEvent(mute, 'click', function () {
+			if (!sessionall) {
+				console.warn("No session to toggle mute");
+				return;
+			}
+
+			var pc = sessionall.sessionDescriptionHandler.peerConnection;
+			if (pc.getSenders) {
+				pc.getSenders().forEach(function (sender) {
+					if (sender.track) {
+						sender.track.enabled = false;
+					}
+				});
+			} else {
+				pc.getLocalStreams().forEach(function (stream) {
+					stream.getAudioTracks().forEach(function (track) {
+						track.enabled = false;
+					});
+					stream.getVideoTracks().forEach(function (track) {
+						track.enabled = false;
+					});
+				});
+			}
+		})
+
+		// 解除静音
+		bindEvent(unmute, 'click', function () {
+			if (!sessionall) {
+				console.warn("No session to toggle mute");
+				return;
+			}
+
+			var pc = sessionall.sessionDescriptionHandler.peerConnection;
+			if (pc.getSenders) {
+				pc.getSenders().forEach(function (sender) {
+					if (sender.track) {
+						sender.track.enabled = true;
+					}
+				});
+			} else {
+				pc.getLocalStreams().forEach(function (stream) {
+					stream.getAudioTracks().forEach(function (track) {
+						track.enabled = true;
+					});
+					stream.getVideoTracks().forEach(function (track) {
+						track.enabled = true;
+					});
+				});
+			}
+		})
+
+		//注册失败
+		ua.on('registrationFailed', function (response, cause) {
+			alert('注册失败'+cause)
+		})
+
+		// 接受入站（用户代理服务器）会话
+		ua.on('invite', function (session) {
+
+			var url = session.remoteIdentity.uri.toString() + "来电了，是否接听";
+
+			var remoteVideo = document.getElementById('remoteVideo');
+			var localVideo = document.getElementById('localVideo');
+
+
+			session.on("terminated", function (message, cause) {
+				console.error(message);
+
+			})
+
+			/**
+			 *
+			 */
+			session.on('accepted', function (response, cause) {
+				console.error(response);
+				console.error(session);
+				Ring.stopRingTone();
+				// If there is a video track, it will attach the video and audio to the same element
+				var pc = this.sessionDescriptionHandler.peerConnection;
+				console.error(this.sessionDescriptionHandler);
+				var remoteStream;
+
+				if (pc.getReceivers) {
+					remoteStream = new window.MediaStream();
+					pc.getReceivers().forEach(function (receiver) {
+						var track = receiver.track;
+						if (track) {
+							remoteStream.addTrack(track);
+						}
+					});
+				} else {
+					remoteStream = pc.getRemoteStreams()[0];
+				}
+				remoteVideo.srcObject = remoteStream;
+
+
+				var localStream_1;
+				if (pc.getSenders) {
+					localStream_1 = new window.MediaStream();
+					pc.getSenders().forEach(function (sender) {
+						var track = sender.track;
+						if (track && track.kind === "video") {
+							localStream_1.addTrack(track);
+						}
+					});
+				}
+				else {
+					localStream_1 = pc.getLocalStreams()[0];
+				}
+				localVideo.srcObject = localStream_1;
+				localVideo.volume = 0;
+
+
+			})
+
+			session.on('bye', function (resp, cause) {
+			});
+
+			var isaccept = confirm(url);
+			if (isaccept) {
+				//接受来电
+				session.accept({
+					sessionDescriptionHandlerOptions: {
+						constraints: {
+							audio: true,
+							video: false
+						}
+					}
+				});
+				sessionall = session;
+			}
+			else {
+				//拒绝来电
+				session.reject();
+			}
+
+		});
+
+	</script>
+
+</body>
+
+</html>
